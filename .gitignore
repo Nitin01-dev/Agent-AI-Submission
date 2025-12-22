@@ -1,0 +1,18 @@
+# Secret Keys
+.env
+
+# Databases
+agent_db/
+interactive_db/
+
+# Python temporary files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Mac system files
+.DS_Store
+
+# Virtual Environments
+venv/
+env/
