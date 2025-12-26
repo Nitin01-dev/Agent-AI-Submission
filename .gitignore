@@ -1,18 +1,33 @@
-# Secret Keys
+# Secret Keys & Environment Variables
 .env
+.env.*
+.env.local
 
-# Databases
+# Project Specific Databases (from your previous file)
 agent_db/
 interactive_db/
 
-# Python temporary files
+# Python temporary files & Cache
 __pycache__/
 *.py[cod]
 *$py.class
-
-# Mac system files
-.DS_Store
+.pytest_cache/
 
 # Virtual Environments
 venv/
+.venv/
 env/
+bin/
+lib/
+
+# IDE Settings (VS Code, PyCharm)
+.vscode/
+.idea/
+
+# System Files
+.DS_Store
+Thumbs.db
+
+# LangSmith / LangChain specific logs
+*.log
+.langchain/
