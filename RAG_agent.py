@@ -1,5 +1,5 @@
 import os
-from typing import TypedDict, List
+from pathlib import Path
 from dotenv import load_dotenv
 
 # --- 1. ENVIRONMENT SETUP ---
@@ -11,7 +11,9 @@ if not os.getenv("OPENAI_API_KEY"):
     print("❌ ERROR: OPENAI_API_KEY not found.")
     print("Please ensure you have a .env file with your keys.")
 
-# --- 2. IMPORTS ---
+
+# --- STEP 2: IMPORTS ---
+from typing import TypedDict, List
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 from langchain_chroma import Chroma
 from langchain_community.document_loaders import WebBaseLoader
@@ -19,79 +21,75 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_core.prompts import ChatPromptTemplate
 from langgraph.graph import START, END, StateGraph
 
-# --- 3. RAG SETUP (Knowledge Base) ---
+# --- STEP 3: KNOWLEDGE BASE (RAG) ---
 def setup_knowledge_base():
-    print("--- SCRAPING DATA ---")
-    url = "https://en.wikipedia.org/wiki/Artificial_intelligence"
+    print("--- 1. SCRAPING WEBSOURCE ---")
+    url= "https://python.langchain.com/docs/tutorials/multi_agent/"
     loader = WebBaseLoader(url)
     docs = loader.load()
     
-    # Splitting long text into smaller chunks
     text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
     splits = text_splitter.split_documents(docs)
     
-    # Creating the vector database
-    print("--- INDEXING DATA ---")
+    print("--- 2. BUILDING DATABASE ---")
     vectorstore = Chroma.from_documents(
         documents=splits, 
         embedding=OpenAIEmbeddings(),
-        persist_directory="./agent_db"
+        persist_directory="./interactive_db"
     )
     return vectorstore.as_retriever(search_kwargs={"k": 3})
 
-# Initialize the retriever
 retriever = setup_knowledge_base()
 
-# --- 4. GRAPH STATE & NODES ---
+# --- STEP 4: AGENT LOGIC (LANGGRAPH) ---
 class AgentState(TypedDict):
     question: str
     context: List
     answer: str
 
 def retrieve_node(state: AgentState):
-    """Search for relevant documents based on the user question."""
-    print("--- RETRIEVING CONTEXT ---")
-    return {"context": retriever.invoke(state["question"])}
+    print("--- 3. SEARCHING DATABASE ---")
+    question = state["question"]
+    documents = retriever.invoke(question)
+    return {"context": documents}
 
 def generate_node(state: AgentState):
-    """Generate an answer using the LLM and retrieved context."""
-    print("--- GENERATING ANSWER ---")
+    print("--- 4. GENERATING ANSWER ---")
     llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
-    
-    # Format the context for the prompt
     context_text = "\n\n".join([doc.page_content for doc in state["context"]])
     
     prompt = ChatPromptTemplate.from_template(
-        "Use the following context to answer the question:\n\n{context}\n\nQuestion: {question}"
+        "You are a technical assistant. Use the following LangChain documentation"
+        "to answer the question accurately.\n\nContext: {context}\n\nQuestion: {question}"
     )
     
     chain = prompt | llm
     response = chain.invoke({"context": context_text, "question": state["question"]})
     return {"answer": response.content}
 
-# --- 5. LANGGRAPH WORKFLOW ---
+# --- STEP 5: BUILD THE GRAPH ---
 workflow = StateGraph(AgentState)
-
-# Add Nodes
 workflow.add_node("retrieve", retrieve_node)
 workflow.add_node("generate", generate_node)
-
-# Connect Nodes (Edges)
 workflow.add_edge(START, "retrieve")
 workflow.add_edge("retrieve", "generate")
 workflow.add_edge("generate", END)
-
-# Compile the Agent
 agent_app = workflow.compile()
 
-# --- 6. EXECUTION ---
+# --- STEP 6: RUN INTERACTIVE LOOP ---
 if __name__ == "__main__":
-    user_query = "What are the main goals of AI research?"
-    print(f"\nUSER QUESTION: {user_query}")
-    
-    # Run the agent
-    result = agent_app.invoke({"question": user_query})
-    
     print("\n" + "="*50)
-    print(f"AI RESPONSE:\n{result['answer']}")
+    print("AI AGENT IS READY")
     print("="*50)
+    
+    while True:
+        user_query = input("\nAsk me anything about 'Langchain' (or type 'exit'): ")
+        
+        if user_query.lower() in ['exit', 'quit', 'q']:
+            print("Goodbye!")
+            break
+            
+        if user_query.strip():
+            result = agent_app.invoke({"question": user_query})
+            print(f"\nAI ANSWER:\n{result['answer']}")
+            print("-" * 30)
